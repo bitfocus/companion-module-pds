@@ -8,20 +8,17 @@ const PDS_VARIANT_901 = 2
 const PDS_VARIANT_902 = 3
 
 function instance (system, id, config) {
-	const self = this
-
 	this.firmwareVersion = '0'
 
 	// super-constructor
 	instance_skel.apply(this, arguments)
 
-	self.actions() // export actions
+	this.actions() // export actions
 
-	return self
+	return this
 }
 
 instance.prototype.updateConfig = function (config) {
-	const self = this
 	debug('updateConfig() destroying and reiniting..')
 	self.config = config;
 	self.destroy()
@@ -30,25 +27,22 @@ instance.prototype.updateConfig = function (config) {
 }
 
 instance.prototype.init = function () {
-	const self = this
 
-	debug = self.debug
-	log = self.log
+	debug = this.debug
+	log = this.log
 
-	self.states = {}
-	self.init_feedbacks()
+	this.states = {}
+	this.init_feedbacks()
 
-	self.timer = undefined
-	self.init_tcp()
+	this.timer = undefined
+	this.init_tcp()
 }
 
 instance.prototype.dataPoller = function () {
-	const self = this
-
-	if (self.socket === undefined)
+	if (this.socket === undefined)
 		return
 
-	self.socket.send(
+	this.socket.send(
 		'PREVIEW -?\r' +
 		'PROGRAM -?\r' +
 		'LOGOSEL -?\r'
@@ -59,25 +53,25 @@ instance.prototype.init_tcp = function () {
 	const self = this
 	let receivebuffer = ''
 
-	if (self.socket !== undefined) {
-		self.socket.destroy()
-		delete self.socket
+	if (this.socket !== undefined) {
+		this.socket.destroy()
+		delete this.socket
 	}
 
-	if (self.config.host) {
-		self.socket = new tcp(self.config.host, 3000)
+	if (this.config.host) {
+		this.socket = new tcp(this.config.host, 3000)
 
-		self.socket.on('status_change', function (status, message) {
+		this.socket.on('status_change', function (status, message) {
 			self.status(status, message)
 		})
 
-		self.socket.on('error', function (err) {
+		this.socket.on('error', function (err) {
 			debug('Network error', err)
 			self.log('error', 'Network error: ' + err.message)
 			clearInterval(self.timer)
 		})
 
-		self.socket.on('connect', function () {
+		this.socket.on('connect', function () {
 			debug('Connected')
 
 			// Poll data from PDS every 4 secs
@@ -85,7 +79,7 @@ instance.prototype.init_tcp = function () {
 		})
 
 		// separate buffered stream into lines with responses
-		self.socket.on('data', function (chunk) {
+		this.socket.on('data', function (chunk) {
 			let i = 0, line = '', offset = 0
 			receivebuffer += chunk
 			while ((i = receivebuffer.indexOf('\r', offset)) !== -1) {
@@ -96,7 +90,7 @@ instance.prototype.init_tcp = function () {
 			receivebuffer = receivebuffer.substr(offset)
 		})
 
-		self.socket.on('receiveline', function (line) {
+		this.socket.on('receiveline', function (line) {
 			debug('Received line from PDS:', line)
 			// check which device and version we have
 			if (line.match(/ShellApp waiting for input/)) {
@@ -174,7 +168,7 @@ instance.prototype.init_tcp = function () {
 						self.log('error', 'PDS ' + self.config.label + ' says: Checksum didn\'t match: ' + line)
 						break
 					case 9991:
-						self.log('error', 'PDS ' + self.config.label + ' says: Version didn\'t match: ' + line)
+						this.log('error', 'PDS ' + this.config.label + ' says: Version didn\'t match: ' + line)
 						break
 					case 9990:
 						self.log('error', 'Received UI related error from PDS ' + self.config.label + ', current device interface not supported: ' + line)
@@ -201,8 +195,6 @@ instance.prototype.init_tcp = function () {
 
 // Return config fields for web config
 instance.prototype.config_fields = function () {
-	const self = this
-
 	return [
 		{
 			type: 'textinput',
@@ -210,39 +202,36 @@ instance.prototype.config_fields = function () {
 			label: 'IP-Adress of PDS',
 			width: 6,
 			default: '192.168.0.10',
-			regex: self.REGEX_IP
+			regex: this.REGEX_IP
 		},
 		{
 			type: 'dropdown',
 			label: 'Variant',
 			id: 'variant',
 			default: 1,
-			choices: self.PDS_VARIANT
+			choices: this.PDS_VARIANT
 		}
 	]
 }
 
 // When module gets deleted
 instance.prototype.destroy = function () {
-	const self = this
-
-	if (self.timer) {
-		clearInterval(self.timer)
-		delete self.timer
+	if (this.timer) {
+		clearInterval(this.timer)
+		delete this.timer
 	}
 
-	if (self.socket !== undefined) {
-		self.socket.destroy()
+	if (this.socket !== undefined) {
+		this.socket.destroy()
 	}
 
-	self.states = {}
+	this.states = {}
 
-	debug('destroy', self.id)
+	debug('destroy', this.id)
 }
 
 instance.prototype.init_feedbacks = function () {
-	const self = this
-	const feedbacks = {}
+	let feedbacks = {}
 
 	feedbacks['preview_bg'] = {
 		label: 'Change colors for preview',
@@ -252,20 +241,20 @@ instance.prototype.init_feedbacks = function () {
 				type: 'colorpicker',
 				label: 'Foreground color',
 				id: 'fg',
-				default: self.rgb(255, 255, 255)
+				default: this.rgb(255, 255, 255)
 			},
 			{
 				type: 'colorpicker',
 				label: 'Background color',
 				id: 'bg',
-				default: self.rgb(0, 255, 0)
+				default: this.rgb(0, 255, 0)
 			},
 			{
 				type: 'dropdown',
 				label: 'Input',
 				id: 'input',
 				default: 1,
-				choices: self.CHOICES_INPUTS
+				choices: this.CHOICES_INPUTS
 			}
 		]
 	}
@@ -278,20 +267,20 @@ instance.prototype.init_feedbacks = function () {
 				type: 'colorpicker',
 				label: 'Foreground color',
 				id: 'fg',
-				default: self.rgb(255, 255, 255)
+				default: this.rgb(255, 255, 255)
 			},
 			{
 				type: 'colorpicker',
 				label: 'Background color',
 				id: 'bg',
-				default: self.rgb(255, 0, 0)
+				default: this.rgb(255, 0, 0)
 			},
 			{
 				type: 'dropdown',
 				label: 'Input',
 				id: 'input',
 				default: 1,
-				choices: self.CHOICES_INPUTS
+				choices: this.CHOICES_INPUTS
 			}
 		]
 	}
@@ -304,44 +293,42 @@ instance.prototype.init_feedbacks = function () {
 				type: 'colorpicker',
 				label: 'Foreground color',
 				id: 'fg',
-				default: self.rgb(255, 255, 255)
+				default: this.rgb(255, 255, 255)
 			},
 			{
 				type: 'colorpicker',
 				label: 'Background color',
 				id: 'bg',
-				default: self.rgb(255, 0, 0)
+				default: this.rgb(255, 0, 0)
 			},
 			{
 				type: 'dropdown',
 				label: 'Input',
 				id: 'input',
 				default: 1,
-				choices: self.CHOICES_LOGOS
+				choices: this.CHOICES_LOGOS
 			}
 		]
 	}
 
-	self.setFeedbackDefinitions(feedbacks)
+	this.setFeedbackDefinitions(feedbacks)
 }
 
 instance.prototype.feedback = function (feedback, bank) {
-	const self = this
-
 	if (feedback.type === 'program_bg') {
-		if (self.states['program_bg'] === parseInt(feedback.options.input)) {
+		if (this.states['program_bg'] === parseInt(feedback.options.input)) {
 			return { color: feedback.options.fg, bgcolor: feedback.options.bg }
 		}
 	}
 
 	if (feedback.type === 'preview_bg') {
-		if (self.states['preview_bg'] === parseInt(feedback.options.input)) {
+		if (this.states['preview_bg'] === parseInt(feedback.options.input)) {
 			return { color: feedback.options.fg, bgcolor: feedback.options.bg }
 		}
 	}
 
 	if (feedback.type === 'logo_bg') {
-		if (self.states['logo_bg'] === parseInt(feedback.options.input)) {
+		if (this.states['logo_bg'] === parseInt(feedback.options.input)) {
 			return { color: feedback.options.fg, bgcolor: feedback.options.bg }
 		}
 	}
@@ -350,22 +337,20 @@ instance.prototype.feedback = function (feedback, bank) {
 }
 
 instance.prototype.actions = function (system) {
-	const self = this
-
-	self.PDS_VARIANT = [
+	this.PDS_VARIANT = [
 		{ id: PDS_VARIANT_701, label: 'PDS-701' },
 		{ id: PDS_VARIANT_901, label: 'PDS-901' },
 		{ id: PDS_VARIANT_902, label: 'PDS-902' }
 	]
 
-	self.CHOICES_LOGOS = [
+	this.CHOICES_LOGOS = [
 		{ id: 0, label: 'Black' },
 		{ id: 1, label: 'Logo 1' },
 		{ id: 2, label: 'Logo 2' },
 		{ id: 3, label: 'Logo 3' }
 	]
 
-	self.CHOICES_INPUTS = [
+	this.CHOICES_INPUTS = [
 		{ id: 1, label: '1 VGA' },
 		{ id: 2, label: '2 VGA' },
 		{ id: 3, label: '3 VGA' },
@@ -374,7 +359,7 @@ instance.prototype.actions = function (system) {
 		{ id: 6, label: '6 DVI' }
 	]
 
-	self.CHOICES_PIPRECALL = [
+	this.CHOICES_PIPRECALL = [
 		{ id: 1, label: '1' },
 		{ id: 2, label: '2' },
 		{ id: 3, label: '3' },
@@ -387,21 +372,22 @@ instance.prototype.actions = function (system) {
 		{ id: 10, label: '10' }
 	]
 
-	// See self.PDS_VARIANT
-	if (parseInt(self.config.variant) >= PDS_VARIANT_901) {
-		self.CHOICES_INPUTS.push({ id: 7, label: '7 DVI' })
-		self.CHOICES_INPUTS.push({ id: 8, label: '8 DVI' })
+	// See this.PDS_VARIANT
+	// 901 and 902 have DVI
+	if (parseInt(this.config.variant) >= PDS_VARIANT_901) {
+		this.CHOICES_INPUTS.push({ id: 7, label: '7 DVI' })
+		this.CHOICES_INPUTS.push({ id: 8, label: '8 DVI' })
 	}
 
-	// See self.PDS_VARIANT
-	if (self.config.variant == PDS_VARIANT_701 ||
-		self.config.variant == PDS_VARIANT_902) {
-		self.CHOICES_INPUTS.push({ id: 9, label: '9 SDI' })
+	// See this.PDS_VARIANT
+	// Only 901 has no SDI
+	if (parseInt(this.config.variant) !== PDS_VARIANT_901) {
+		this.CHOICES_INPUTS.push({ id: 9, label: '9 SDI' })
 	}
 
-	self.CHOICES_INPUTS.push({ id: 10, label: 'Black/Logo' })
+	this.CHOICES_INPUTS.push({ id: 10, label: 'Black/Logo' })
 
-	self.system.emit('instance_actions', self.id, {
+	this.system.emit('instance_actions', this.id, {
 		'TAKE': {
 			label: 'Take'
 		},
@@ -413,7 +399,7 @@ instance.prototype.actions = function (system) {
 					label: 'Input',
 					id: 'i',
 					default: '1',
-					choices: self.CHOICES_INPUTS
+					choices: this.CHOICES_INPUTS
 				},
 				{
 					type: 'textinput',
@@ -533,7 +519,7 @@ instance.prototype.actions = function (system) {
 				label: 'Framestore',
 				id: 'l',
 				default: '1',
-				choices: self.CHOICES_LOGOS
+				choices: this.CHOICES_LOGOS
 			}]
 		},
 		'LOGOSAVE': {
@@ -596,7 +582,7 @@ instance.prototype.actions = function (system) {
 					label: 'Input',
 					id: 'i',
 					default: '1',
-					choices: self.CHOICES_INPUTS
+					choices: this.CHOICES_INPUTS
 				}
 			]
 		},
@@ -615,7 +601,7 @@ instance.prototype.actions = function (system) {
 					label: 'Input',
 					id: 'f',
 					default: '1',
-					choices: self.CHOICES_PIPRECALL
+					choices: this.CHOICES_PIPRECALL
 				}
 			]
 		}
@@ -623,26 +609,22 @@ instance.prototype.actions = function (system) {
 }
 
 instance.prototype.action = function (action) {
-	const self = this
-
 	let cmd = action.action
 	for (let option in action.options) {
 		if (action.options.hasOwnProperty(option) && action.options[option] !== '') cmd += ' -' + option + ' ' + action.options[option]
 	}
 	cmd += '\r'
-	
-	if (action.action == 'FREEZE') {
+
+	if (action.action === 'FREEZE') {
 		cmd += 'FPUPDATE\r'
 	}
 
-	if (cmd !== undefined) {
-		debug('sending tcp', cmd, 'to', self.config.host)
+	debug('sending tcp', cmd, 'to', this.config.host)
 
-		if (self.socket !== undefined && self.socket.connected) {
-			self.socket.send(cmd)
-		} else {
-			debug('Socket not connected :(')
-		}
+	if (this.socket !== undefined && this.socket.connected) {
+		this.socket.send(cmd)
+	} else {
+		debug('Socket not connected :(')
 	}
 }
 
