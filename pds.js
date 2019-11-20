@@ -1,632 +1,630 @@
-const tcp = require('../../tcp')
-const instance_skel = require('../../instance_skel')
-let debug
-let log
+const tcp          = require('../../tcp');
+const instanceSkel = require('../../instance_skel');
+let debug, log;
 
-const PDS_VARIANT_701 = 1
-const PDS_VARIANT_901 = 2
-const PDS_VARIANT_902 = 3
+const feedbacks = require('./feedbacks');
 
-function instance (system, id, config) {
-	this.firmwareVersion = '0'
+const PDS_VARIANT_701 = 1;
+const PDS_VARIANT_901 = 2;
+const PDS_VARIANT_902 = 3;
 
-	// super-constructor
-	instance_skel.apply(this, arguments)
+/**
+ * Companion instance class for the Epiphan Pearl.
+ *
+ * @extends instanceSkel
+ * @version 1.2.0
+ * @since 1.2.0
+ * @author Marc Hagen <hello@marchagen.nl>
+ */
+class BarcoPDS extends instanceSkel {
 
-	this.actions() // export actions
+	/**
+	 * Create an instance of a BarcoPDS module.
+	 *
+	 * @access public
+	 * @since 1.2.0
+	 * @param {EventEmitter} system - the brains of the operation
+	 * @param {string} id - the instance ID
+	 * @param {Object} config - saved user configuration parameters
+	 */
+	constructor(system, id, config) {
+		super(system, id, config);
 
-	return this
-}
+		this.firmwareVersion = '0';
 
-instance.prototype.updateConfig = function (config) {
-	debug('updateConfig() destroying and reiniting..')
-	self.config = config;
-	self.destroy()
-	self.actions() // export actions
-	self.init()
-}
+		this.states          = {};
+		this.refreshInterval = null;
 
-instance.prototype.init = function () {
-
-	debug = this.debug
-	log = this.log
-
-	this.states = {}
-	this.init_feedbacks()
-
-	this.timer = undefined
-	this.init_tcp()
-}
-
-instance.prototype.dataPoller = function () {
-	if (this.socket === undefined)
-		return
-
-	this.socket.send(
-		'PREVIEW -?\r' +
-		'PROGRAM -?\r' +
-		'LOGOSEL -?\r'
-	)
-}
-
-instance.prototype.init_tcp = function () {
-	const self = this
-	let receivebuffer = ''
-
-	if (this.socket !== undefined) {
-		this.socket.destroy()
-		delete this.socket
+		Object.assign(this, {
+			//...actions,
+			...feedbacks,
+			//...presets,
+			//...variables
+		});
 	}
 
-	if (this.config.host) {
-		this.socket = new tcp(this.config.host, 3000)
+	/**
+	 * Setup the actions.
+	 *
+	 * @access public
+	 * @since 1.2.0
+	 * @param {EventEmitter} system - the brains of the operation
+	 */
+	actions(system = null) {
+		const inputOption = {
+			type: 'dropdown',
+			label: 'Input',
+			id: 'i',
+			default: 1,
+			choices: this.CHOICES_INPUTS
+		};
 
-		this.socket.on('status_change', function (status, message) {
-			self.status(status, message)
-		})
+		this.setActions({
+			'TAKE': {
+				label: 'Take'
+			},
+			'ISEL': {
+				label: 'Select Input',
+				options: [
+					inputOption,
+					{
+						type: 'textinput',
+						label: 'Filenumber (optional)',
+						id: 'f',
+						regex: '/^([1-9]|[1-5][0-9]|6[0-4])$/'
+					}
+				]
+			},
+			'FREEZE': {
+				label: 'Freeze',
+				options: [{
+					type: 'dropdown',
+					label: 'Freeze',
+					id: 'm',
+					default: 1,
+					choices: [{id: 0, label: 'unfrozen'}, {id: 1, label: 'frozen'}]
+				}]
+			},
+			'BLACK': {
+				label: 'Set Black Output',
+				options: [{
+					type: 'dropdown',
+					label: 'Mode',
+					id: 'm',
+					default: 1,
+					choices: [{id: 0, label: 'normal'}, {id: 1, label: 'black'}]
+				}]
+			},
+			'OTPM': {
+				label: 'Set Testpattern on/off',
+				options: [
+					{
+						type: 'dropdown',
+						label: 'Output',
+						id: 'o',
+						default: 1,
+						choices: [{id: 1, label: 'Program'}, {id: 3, label: 'Preview'}]
+					},
+					{
+						type: 'dropdown',
+						label: 'Testpattern',
+						id: 'm',
+						default: 1,
+						choices: [{id: 0, label: 'off'}, {id: 1, label: 'on'}]
+					}
+				]
+			},
+			'OTPT': {
+				label: 'Set Testpattern Type',
+				options: [
+					{
+						type: 'dropdown',
+						label: 'Output',
+						id: 'o',
+						default: 1,
+						choices: [{id: 1, label: 'Program'}, {id: 3, label: 'Preview'}]
+					},
+					{
+						type: 'dropdown',
+						label: 'Type',
+						id: 't',
+						default: 4,
+						choices: [
+							{id: 4, label: '16x16 Grid'},
+							{id: 5, label: '32x32 Grid'},
+							{id: 1, label: 'H Ramp'},
+							{id: 2, label: 'V Ramp'},
+							{id: 6, label: 'Burst'},
+							{id: 7, label: '75% Color Bars'},
+							{id: 3, label: '100% Color Bars'},
+							{id: 9, label: 'Vertical Gray Steps'},
+							{id: 10, label: 'Horizontal Gray Steps'},
+							{id: 8, label: '50% Gray'},
+							{id: 11, label: 'White'},
+							{id: 12, label: 'Black'},
+							{id: 13, label: 'Red'},
+							{id: 14, label: 'Green'},
+							{id: 15, label: 'Blue'}
+						]
+					}
+				]
+			},
+			'ORBM': {
+				label: 'Set Rasterbox on/off',
+				options: [
+					{
+						type: 'dropdown',
+						label: 'Output',
+						id: 'o',
+						default: 1,
+						choices: [{id: 1, label: 'Program'}, {id: 3, label: 'Preview'}]
+					}, {
+						type: 'dropdown',
+						label: 'Rasterbox',
+						id: 'm',
+						default: 1,
+						choices: [{id: 0, label: 'off'}, {id: 1, label: 'on'}]
+					}
+				]
+			},
+			'TRNTIME': {
+				label: 'Set Transition Time',
+				options: [{
+					type: 'textinput',
+					label: 'Seconds',
+					id: 's',
+					default: '1.0',
+					regex: '/^([0-9]|1[0-2])(\\.\\d)?$/'
+				}]
+			},
+			'LOGOSEL': {
+				label: 'Select Black/Logo',
+				options: [{
+					type: 'dropdown',
+					label: 'Framestore',
+					id: 'l',
+					default: 1,
+					choices: this.CHOICES_LOGOS
+				}]
+			},
+			'LOGOSAVE': {
+				label: 'Save Logo',
+				options: [{
+					type: 'dropdown',
+					label: 'Framestore',
+					id: 'l',
+					default: 1,
+					choices: [
+						{id: 1, label: 'Logo 1'},
+						{id: 2, label: 'Logo 2'},
+						{id: 3, label: 'Logo 3'}
+					]
+				}]
+			},
+			'AUTOTAKE': {
+				label: 'Set Autotake Mode on/off',
+				options: [{
+					type: 'dropdown',
+					label: 'Autotake',
+					id: 'm',
+					default: '0',
+					choices: [{id: 0, label: 'off'}, {id: 1, label: 'on'}]
+				}]
+			},
+			'PENDPIP': {
+				label: 'Pend PiP Mode on/off',
+				options: [
+					{
+						type: 'dropdown',
+						label: 'PiP',
+						id: 'p',
+						default: '1',
+						choices: [{id: 1, label: 'PiP 1'}, {id: 2, label: 'PiP 2'}]
+					}, {
+						type: 'dropdown',
+						label: 'PiP on/off',
+						id: 'm',
+						default: '0',
+						choices: [{id: 0, label: 'unpend (no change on Take)'}, {
+							id: 1,
+							label: 'pend (PiP on/off on Take)'
+						}]
+					}
+				]
+			},
+			'PIPISEL': {
+				label: 'Pend PiP Input',
+				options: [
+					{
+						type: 'dropdown',
+						label: 'PiP',
+						id: 'p',
+						default: 1,
+						choices: [{id: 0, label: 'All PiPs'}, {id: 1, label: 'PiP 1'}, {id: 2, label: 'PiP 2'}]
+					},
+					inputOption
+				]
+			},
+			'PIPREC': {
+				label: 'PiP Recall',
+				options: [
+					{
+						type: 'dropdown',
+						label: 'PiP',
+						id: 'p',
+						default: 1,
+						choices: [{id: 1, label: 'PiP 1'}, {id: 2, label: 'PiP 2'}]
+					},
+					{
+						type: 'dropdown',
+						label: 'Input',
+						id: 'f',
+						default: 1,
+						choices: this.CHOICES_PIPRECALL
+					}
+				]
+			}
+		});
+	}
 
-		this.socket.on('error', function (err) {
-			debug('Network error', err)
-			self.log('error', 'Network error: ' + err.message)
-			clearInterval(self.timer)
-		})
+	/**
+	 * Executes the provided action.
+	 *
+	 * @access public
+	 * @since 1.2.0
+	 * @param {Object} action - the action to be executed
+	 * @param {Object} deviceInfo - information from where the button was pressed...
+	 */
+	action(action, deviceInfo) {
+		if (!this._isConnected) {
+			return;
+		}
 
-		this.socket.on('connect', function () {
-			debug('Connected')
+		let cmd = action.action;
+		for (let option in action.options) {
+			if (action.options.hasOwnProperty(option) && action.options[option] !== '') cmd += ' -' + option + ' ' + action.options[option];
+		}
+		cmd += '\r';
 
-			// Poll data from PDS every 4 secs
-			self.timer = setInterval(self.dataPoller.bind(self), 4000)
-		})
+		if (action.action === 'FREEZE') {
+			cmd += 'FPUPDATE\r';
+		}
+
+		debug('sending tcp', cmd, 'to', this.config.host);
+		this.socket.send(cmd);
+	}
+
+	/**
+	 * Creates the configuration fields for web config.
+	 *
+	 * @access public
+	 * @since 1.2.0
+	 * @returns {Array} the config fields
+	 */
+	config_fields() {
+		return [
+			{
+				type: 'textinput',
+				id: 'host',
+				label: 'IP-Adress of PDS',
+				width: 6,
+				default: '192.168.0.10',
+				regex: this.REGEX_IP
+			},
+			{
+				type: 'dropdown',
+				label: 'Variant',
+				id: 'variant',
+				default: 1,
+				choices: this.PDS_VARIANT
+			}
+		];
+	}
+
+	/**
+	 * Clean up the instance before it is destroyed.
+	 *
+	 * @access public
+	 * @since 1.2.0
+	 */
+	destroy() {
+		if (this.refreshInterval) {
+			clearInterval(this.refreshInterval);
+			this.refreshInterval = null;
+		}
+
+		if (this.socket) {
+			this.socket.destroy();
+		}
+
+		this.states = {};
+
+		debug('destroy', this.id);
+	}
+
+	/**
+	 * Main initialization function called once the module
+	 * is OK to start doing things.
+	 *
+	 * @access public
+	 * @since 1.2.0
+	 */
+	init() {
+		debug = this.debug;
+		log   = this.log;
+
+		this.status(this.STATUS_UNKNOWN);
+
+		this._initTcp();
+		this._updateSystem();
+	}
+
+	/**
+	 * Process an updated configuration array.
+	 *
+	 * @access public
+	 * @since 1.2.0
+	 * @param {Object} config - the new configuration
+	 */
+	updateConfig(config) {
+		this.config = config;
+
+		this.destroy();
+		this.init();
+	}
+
+	/**
+	 * INTERNAL: setup default request data for requests
+	 *
+	 * @private
+	 * @since 1.2.0
+	 */
+	_initTcp() {
+		if (!this.config.host) {
+			return;
+		}
+
+		this.status(this.STATE_WARNING, 'Connecting');
+		this.socket = new tcp(this.config.host, 3000);
+
+		this.socket.on('status_change', (status, message) => {
+			this.status(status, message);
+		});
+
+		this.socket.on('error', (err) => {
+			debug("Network error", err);
+			this.status(this.STATE_ERROR, err);
+			this.log('error', `Network error: ${err.message}`);
+			if (this.refreshInterval) clearInterval(this.refreshInterval);
+		});
+
+		this.socket.on('connect', () => {
+			this.status(this.STATE_OK);
+			debug("Connected");
+			this.refreshInterval = setInterval(this.refreshData.bind(this), 1000);
+		});
 
 		// separate buffered stream into lines with responses
-		this.socket.on('data', function (chunk) {
-			let i = 0, line = '', offset = 0
-			receivebuffer += chunk
+		let receivebuffer = '';
+		this.socket.on('data', (chunk) => {
+			let i, line = '', offset = 0;
+			receivebuffer += chunk;
 			while ((i = receivebuffer.indexOf('\r', offset)) !== -1) {
-				line = receivebuffer.substr(offset, i - offset)
-				offset = i + 1
-				self.socket.emit('receiveline', line.toString())
+				line   = receivebuffer.substr(offset, i - offset);
+				offset = i + 1;
+				this.socket.emit('receiveline', line.toString());
 			}
-			receivebuffer = receivebuffer.substr(offset)
-		})
+			receivebuffer = receivebuffer.substr(offset);
+		});
 
-		this.socket.on('receiveline', function (line) {
-			debug('Received line from PDS:', line)
+		this.socket.on('receiveline', (line) => {
 			// check which device and version we have
 			if (line.match(/ShellApp waiting for input/)) {
-				self.socket.send(
+				this.socket.send(
 					'\r' +
 					'VER -?\r' +
 					'PREVIEW -?\r' +
 					'PROGRAM -?\r' +
 					'LOGOSEL -?\r'
-				)
+				);
 			}
 
 			if (line.match(/VER \d/)) {
-				self.firmwareVersion = line.match(/VER ((?:\d+\.?)+)/)[1]
+				this.firmwareVersion = line.match(/VER ((?:\d+\.?)+)/)[1];
 			}
 
 			if (line.match(/PREVIEW -i\d+/)) {
-				self.states['preview_bg'] = parseInt(line.match(/-i(\d+)/)[1])
-				self.checkFeedbacks('preview_bg')
+				this.states['preview_bg'] = parseInt(line.match(/-i(\d+)/)[1]);
+				this.checkFeedbacks('preview_bg');
 			}
 			if (line.match(/PROGRAM -i\d+/)) {
-				self.states['program_bg'] = parseInt(line.match(/-i(\d+)/)[1])
-				self.checkFeedbacks('program_bg')
+				this.states['program_bg'] = parseInt(line.match(/-i(\d+)/)[1]);
+				this.checkFeedbacks('program_bg');
 			}
 			if (line.match(/LOGOSEL -l \d+/)) {
-				self.states['logo_bg'] = parseInt(line.match(/-l (\d+)/)[1])
-				self.checkFeedbacks('logo_bg')
+				this.states['logo_bg'] = parseInt(line.match(/-l (\d+)/)[1]);
+				this.checkFeedbacks('logo_bg');
 			}
 
 			// Save current state preview for feedback
 			if (line.match(/ISEL -i \d+/)) {
-				self.states['preview_bg'] = parseInt(line.match(/-i (\d+)/)[1])
-				self.checkFeedbacks('preview_bg')
+				this.states['preview_bg'] = parseInt(line.match(/-i (\d+)/)[1]);
+				this.checkFeedbacks('preview_bg');
 			}
 
 			// Save current state preview for feedback
 			if (line.match(/TAKE -e 0/)) {
-				const curPreview = self.states['preview_bg']
-				self.states['preview_bg'] = self.states['program_bg']
-				self.states['program_bg'] = curPreview
-				self.checkFeedbacks('preview_bg')
-				self.checkFeedbacks('program_bg')
+				const curPreview          = this.states['preview_bg'];
+				this.states['preview_bg'] = this.states['program_bg'];
+				this.states['program_bg'] = curPreview;
+				this.checkFeedbacks('preview_bg');
+				this.checkFeedbacks('program_bg');
 			}
 
 			if (line.match(/-e -\d+/)) {
 				if (line.match(/ISEL -e -9999/)) {
-					self.log('error', 'Current selected input "' + self.states['preview_bg'] +
-						'" on ' + self.config.label + ' is' + ' a invalid signal!')
-					return
+					this.log('error', 'Current selected input "' + this.states['preview_bg'] +
+						'" on ' + this.config.label + ' is' + ' a invalid signal!');
+					return;
 				}
 
 				switch (parseInt(line.match(/-e -(\d+)/)[1])) {
 					case 9999:
-						self.log('error', 'Received generic fail error from PDS ' + self.config.label + ': ' + line)
-						break
+						self.log('error', 'Received generic fail error from PDS ' + this.config.label + ': ' + line);
+						break;
 					case 9998:
-						self.log('error', 'PDS ' + self.config.label + ' says: Operation is not applicable in current state: ' + line)
-						break
+						this.log('error', 'PDS ' + this.config.label + ' says: Operation is not applicable in current state: ' + line);
+						break;
 					case 9997:
-						self.log('error', 'Received UI related error from PDS ' + self.config.label + ', did not get response from device: ' + line)
-						break
+						this.log('error', 'Received UI related error from PDS ' + this.config.label + ', did not get response from device: ' + line);
+						break;
 					case 9996:
-						self.log('error', 'Received UI related error from PDS ' + self.config.label + ', did not get valid response from device: ' + line)
-						break
+						this.log('error', 'Received UI related error from PDS ' + this.config.label + ', did not get valid response from device: ' + line);
+						break;
 					case 9995:
-						self.log('error', 'PDS ' + self.config.label + ' says: Timeout occurred: ' + line)
-						break
+						this.log('error', 'PDS ' + this.config.label + ' says: Timeout occurred: ' + line);
+						break;
 					case 9994:
-						self.log('error', 'PDS ' + self.config.label + ' says: Parameter / data out of range: ' + line)
-						break
+						this.log('error', 'PDS ' + this.config.label + ' says: Parameter / data out of range: ' + line);
+						break;
 					case 9993:
-						self.log('error', 'PDS ' + self.config.label + ' says: Searching for data in an index, no matching data: ' + line)
-						break
+						this.log('error', 'PDS ' + this.config.label + ' says: Searching for data in an index, no matching data: ' + line);
+						break;
 					case 9992:
-						self.log('error', 'PDS ' + self.config.label + ' says: Checksum didn\'t match: ' + line)
-						break
+						this.log('error', 'PDS ' + this.config.label + ' says: Checksum didn\'t match: ' + line);
+						break;
 					case 9991:
-						this.log('error', 'PDS ' + this.config.label + ' says: Version didn\'t match: ' + line)
-						break
+						this.log('error', 'PDS ' + this.config.label + ' says: Version didn\'t match: ' + line);
+						break;
 					case 9990:
-						self.log('error', 'Received UI related error from PDS ' + self.config.label + ', current device interface not supported: ' + line)
-						break
+						this.log('error', 'Received UI related error from PDS ' + this.config.label + ', current device interface not supported: ' + line);
+						break;
 					case 9989:
-						self.log('error', 'PDS ' + self.config.label + ' says: Pointer operation invalid: ' + line)
-						break
+						this.log('error', 'PDS ' + this.config.label + ' says: Pointer operation invalid: ' + line);
+						break;
 					case 9988:
-						self.log('error', 'PDS ' + self.config.label + ' says: Part of command had error: ' + line)
-						break
+						this.log('error', 'PDS ' + this.config.label + ' says: Part of command had error: ' + line);
+						break;
 					case 9987:
-						self.log('error', 'PDS ' + self.config.label + ' says: Buffer overflow: ' + line)
-						break
+						this.log('error', 'PDS ' + this.config.label + ' says: Buffer overflow: ' + line);
+						break;
 					case 9986:
-						self.log('error', 'PDS ' + self.config.label + ' says: Initialization is not done (still in progress): ' + line)
-						break
+						this.log('error', 'PDS ' + this.config.label + ' says: Initialization is not done (still in progress): ' + line);
+						break;
 					default:
-						self.log('error', 'Received unspecified error from PDS ' + self.config.label + ': ' + line)
+						this.log('error', 'Received unspecified error from PDS ' + this.config.label + ': ' + line);
 				}
 			}
-		})
+		});
 	}
-}
 
-// Return config fields for web config
-instance.prototype.config_fields = function () {
-	return [
-		{
-			type: 'textinput',
-			id: 'host',
-			label: 'IP-Adress of PDS',
-			width: 6,
-			default: '192.168.0.10',
-			regex: this.REGEX_IP
-		},
-		{
-			type: 'dropdown',
-			label: 'Variant',
-			id: 'variant',
-			default: 1,
-			choices: this.PDS_VARIANT
+	/**
+	 * INTERNAL: Is socket connected?
+	 *
+	 * @private
+	 * @returns {boolean}
+	 */
+	_isConnected() {
+		return this.socket !== undefined && this.socket.connected;
+	}
+
+	/**
+	 * INTERNAL: Setup constants
+	 *
+	 * @private
+	 * @since 1.2.0
+	 */
+	_initConstants() {
+		this.PDS_VARIANT = [
+			{id: PDS_VARIANT_701, label: 'PDS-701'},
+			{id: PDS_VARIANT_901, label: 'PDS-901'},
+			{id: PDS_VARIANT_902, label: 'PDS-902'}
+		];
+
+		this.CHOICES_LOGOS = [
+			{id: 0, label: 'Black'},
+			{id: 1, label: 'Logo 1'},
+			{id: 2, label: 'Logo 2'},
+			{id: 3, label: 'Logo 3'}
+		];
+
+		this.CHOICES_INPUTS = [
+			{id: 1, label: '1 VGA'},
+			{id: 2, label: '2 VGA'},
+			{id: 3, label: '3 VGA'},
+			{id: 4, label: '4 VGA'},
+			{id: 5, label: '5 DVI'},
+			{id: 6, label: '6 DVI'}
+		];
+
+		this.CHOICES_PIPRECALL = [
+			{id: 1, label: '1'},
+			{id: 2, label: '2'},
+			{id: 3, label: '3'},
+			{id: 4, label: '4'},
+			{id: 5, label: '5'},
+			{id: 6, label: '6'},
+			{id: 7, label: '7'},
+			{id: 8, label: '8'},
+			{id: 9, label: '9'},
+			{id: 10, label: '10'}
+		];
+
+		// See this.PDS_VARIANT
+		// 901 and 902 have DVI
+		if (parseInt(this.config.variant) >= PDS_VARIANT_901) {
+			this.CHOICES_INPUTS.push({id: 7, label: '7 DVI'});
+			this.CHOICES_INPUTS.push({id: 8, label: '8 DVI'});
 		}
-	]
-}
 
-// When module gets deleted
-instance.prototype.destroy = function () {
-	if (this.timer) {
-		clearInterval(this.timer)
-		delete this.timer
-	}
-
-	if (this.socket !== undefined) {
-		this.socket.destroy()
-	}
-
-	this.states = {}
-
-	debug('destroy', this.id)
-}
-
-instance.prototype.init_feedbacks = function () {
-	let feedbacks = {}
-
-	feedbacks['preview_bg'] = {
-		label: 'Change colors for preview',
-		description: 'If the input specified is in use by preview, change colors of the bank',
-		options: [
-			{
-				type: 'colorpicker',
-				label: 'Foreground color',
-				id: 'fg',
-				default: this.rgb(255, 255, 255)
-			},
-			{
-				type: 'colorpicker',
-				label: 'Background color',
-				id: 'bg',
-				default: this.rgb(0, 255, 0)
-			},
-			{
-				type: 'dropdown',
-				label: 'Input',
-				id: 'input',
-				default: 1,
-				choices: this.CHOICES_INPUTS
-			}
-		]
-	}
-
-	feedbacks['program_bg'] = {
-		label: 'Change colors for program',
-		description: 'If the input specified is in use by program, change colors of the bank',
-		options: [
-			{
-				type: 'colorpicker',
-				label: 'Foreground color',
-				id: 'fg',
-				default: this.rgb(255, 255, 255)
-			},
-			{
-				type: 'colorpicker',
-				label: 'Background color',
-				id: 'bg',
-				default: this.rgb(255, 0, 0)
-			},
-			{
-				type: 'dropdown',
-				label: 'Input',
-				id: 'input',
-				default: 1,
-				choices: this.CHOICES_INPUTS
-			}
-		]
-	}
-
-	feedbacks['logo_bg'] = {
-		label: 'Change colors for logo',
-		description: 'If the logo specified is in use, change colors of the bank',
-		options: [
-			{
-				type: 'colorpicker',
-				label: 'Foreground color',
-				id: 'fg',
-				default: this.rgb(255, 255, 255)
-			},
-			{
-				type: 'colorpicker',
-				label: 'Background color',
-				id: 'bg',
-				default: this.rgb(255, 0, 0)
-			},
-			{
-				type: 'dropdown',
-				label: 'Input',
-				id: 'input',
-				default: 1,
-				choices: this.CHOICES_LOGOS
-			}
-		]
-	}
-
-	this.setFeedbackDefinitions(feedbacks)
-}
-
-instance.prototype.feedback = function (feedback, bank) {
-	if (feedback.type === 'program_bg') {
-		if (this.states['program_bg'] === parseInt(feedback.options.input)) {
-			return { color: feedback.options.fg, bgcolor: feedback.options.bg }
+		// See this.PDS_VARIANT
+		// Only 901 has no SDI
+		if (parseInt(this.config.variant) !== PDS_VARIANT_901) {
+			this.CHOICES_INPUTS.push({id: 9, label: '9 SDI'});
 		}
+
+		this.CHOICES_INPUTS.push({id: 10, label: 'Black/Logo'});
 	}
 
-	if (feedback.type === 'preview_bg') {
-		if (this.states['preview_bg'] === parseInt(feedback.options.input)) {
-			return { color: feedback.options.fg, bgcolor: feedback.options.bg }
+	/**
+	 * INTERNAL: Getting the data from the PDS and update feedbacks
+	 *
+	 * @private
+	 * @since 1.2.0
+	 */
+	_refreshData() {
+		if (!this._isConnected) {
+			return;
 		}
+
+		this.socket.send(
+			'PREVIEW -?\r' +
+			'PROGRAM -?\r' +
+			'LOGOSEL -?\r'
+		);
+	};
+
+	/**
+	 * INTERNAL: Get action from the options for start and stop
+	 *
+	 * @private
+	 * @since 1.2.0
+	 */
+	_updateSystem() {
+		this._initConstants();
+		this.actions();
+		this._updateFeedbacks();
 	}
 
-	if (feedback.type === 'logo_bg') {
-		if (this.states['logo_bg'] === parseInt(feedback.options.input)) {
-			return { color: feedback.options.fg, bgcolor: feedback.options.bg }
-		}
-	}
-
-	return {}
-}
-
-instance.prototype.actions = function (system) {
-	this.PDS_VARIANT = [
-		{ id: PDS_VARIANT_701, label: 'PDS-701' },
-		{ id: PDS_VARIANT_901, label: 'PDS-901' },
-		{ id: PDS_VARIANT_902, label: 'PDS-902' }
-	]
-
-	this.CHOICES_LOGOS = [
-		{ id: 0, label: 'Black' },
-		{ id: 1, label: 'Logo 1' },
-		{ id: 2, label: 'Logo 2' },
-		{ id: 3, label: 'Logo 3' }
-	]
-
-	this.CHOICES_INPUTS = [
-		{ id: 1, label: '1 VGA' },
-		{ id: 2, label: '2 VGA' },
-		{ id: 3, label: '3 VGA' },
-		{ id: 4, label: '4 VGA' },
-		{ id: 5, label: '5 DVI' },
-		{ id: 6, label: '6 DVI' }
-	]
-
-	this.CHOICES_PIPRECALL = [
-		{ id: 1, label: '1' },
-		{ id: 2, label: '2' },
-		{ id: 3, label: '3' },
-		{ id: 4, label: '4' },
-		{ id: 5, label: '5' },
-		{ id: 6, label: '6' },
-		{ id: 7, label: '7' },
-		{ id: 8, label: '8' },
-		{ id: 9, label: '9' },
-		{ id: 10, label: '10' }
-	]
-
-	// See this.PDS_VARIANT
-	// 901 and 902 have DVI
-	if (parseInt(this.config.variant) >= PDS_VARIANT_901) {
-		this.CHOICES_INPUTS.push({ id: 7, label: '7 DVI' })
-		this.CHOICES_INPUTS.push({ id: 8, label: '8 DVI' })
-	}
-
-	// See this.PDS_VARIANT
-	// Only 901 has no SDI
-	if (parseInt(this.config.variant) !== PDS_VARIANT_901) {
-		this.CHOICES_INPUTS.push({ id: 9, label: '9 SDI' })
-	}
-
-	this.CHOICES_INPUTS.push({ id: 10, label: 'Black/Logo' })
-
-	this.system.emit('instance_actions', this.id, {
-		'TAKE': {
-			label: 'Take'
-		},
-		'ISEL': {
-			label: 'Select Input',
-			options: [
-				{
-					type: 'dropdown',
-					label: 'Input',
-					id: 'i',
-					default: '1',
-					choices: this.CHOICES_INPUTS
-				},
-				{
-					type: 'textinput',
-					label: 'Filenumber (optional)',
-					id: 'f',
-					default: '',
-					regex: '/^([1-9]|[1-5][0-9]|6[0-4])$/'
-				}
-			]
-		},
-		'FREEZE': {
-			label: 'Freeze',
-			options: [{
-				type: 'dropdown',
-				label: 'Freeze',
-				id: 'm',
-				default: '1',
-				choices: [{ id: 0, label: 'unfrozen' }, { id: 1, label: 'frozen' }]
-			}]
-		},
-		'BLACK': {
-			label: 'Set Black Output',
-			options: [{
-				type: 'dropdown',
-				label: 'Mode',
-				id: 'm',
-				default: '1',
-				choices: [{ id: 0, label: 'normal' }, { id: 1, label: 'black' }]
-			}]
-		},
-		'OTPM': {
-			label: 'Set Testpattern on/off',
-			options: [
-				{
-					type: 'dropdown',
-					label: 'Output',
-					id: 'o',
-					default: '1',
-					choices: [{ id: 1, label: 'Program' }, { id: 3, label: 'Preview' }]
-				},
-				{
-					type: 'dropdown',
-					label: 'Testpattern',
-					id: 'm',
-					default: '1',
-					choices: [{ id: 0, label: 'off' }, { id: 1, label: 'on' }]
-				}
-			]
-		},
-		'OTPT': {
-			label: 'Set Testpattern Type',
-			options: [
-				{
-					type: 'dropdown',
-					label: 'Output',
-					id: 'o',
-					default: '1',
-					choices: [{ id: 1, label: 'Program' }, { id: 3, label: 'Preview' }]
-				},
-				{
-					type: 'dropdown',
-					label: 'Type',
-					id: 't',
-					default: '4',
-					choices: [
-						{ id: 4, label: '16x16 Grid' },
-						{ id: 5, label: '32x32 Grid' },
-						{ id: 1, label: 'H Ramp' },
-						{ id: 2, label: 'V Ramp' },
-						{ id: 6, label: 'Burst' },
-						{ id: 7, label: '75% Color Bars' },
-						{ id: 3, label: '100% Color Bars' },
-						{ id: 9, label: 'Vertical Gray Steps' },
-						{ id: 10, label: 'Horizontal Gray Steps' },
-						{ id: 8, label: '50% Gray' },
-						{ id: 11, label: 'White' },
-						{ id: 12, label: 'Black' },
-						{ id: 13, label: 'Red' },
-						{ id: 14, label: 'Green' },
-						{ id: 15, label: 'Blue' }
-					]
-				}
-			]
-		},
-		'ORBM': {
-			label: 'Set Rasterbox on/off',
-			options: [
-				{
-					type: 'dropdown',
-					label: 'Output',
-					id: 'o',
-					default: '1',
-					choices: [{ id: 1, label: 'Program' }, { id: 3, label: 'Preview' }]
-				}, {
-					type: 'dropdown',
-					label: 'Rasterbox',
-					id: 'm',
-					default: '1',
-					choices: [{ id: 0, label: 'off' }, { id: 1, label: 'on' }]
-				}
-			]
-		},
-		'TRNTIME': {
-			label: 'Set Transition Time',
-			options: [{
-				type: 'textinput',
-				label: 'Seconds',
-				id: 's',
-				default: '1.0',
-				regex: '/^([0-9]|1[0-2])(\\.\\d)?$/'
-			}]
-		},
-		'LOGOSEL': {
-			label: 'Select Black/Logo',
-			options: [{
-				type: 'dropdown',
-				label: 'Framestore',
-				id: 'l',
-				default: '1',
-				choices: this.CHOICES_LOGOS
-			}]
-		},
-		'LOGOSAVE': {
-			label: 'Save Logo',
-			options: [{
-				type: 'dropdown',
-				label: 'Framestore',
-				id: 'l',
-				default: '1',
-				choices: [
-					{ id: 1, label: 'Logo 1' },
-					{ id: 2, label: 'Logo 2' },
-					{ id: 3, label: 'Logo 3' }
-				]
-			}]
-		},
-		'AUTOTAKE': {
-			label: 'Set Autotake Mode on/off',
-			options: [{
-				type: 'dropdown',
-				label: 'Autotake',
-				id: 'm',
-				default: '0',
-				choices: [{ id: 0, label: 'off' }, { id: 1, label: 'on' }]
-			}]
-		},
-		'PENDPIP': {
-			label: 'Pend PiP Mode on/off',
-			options: [
-				{
-					type: 'dropdown',
-					label: 'PiP',
-					id: 'p',
-					default: '1',
-					choices: [{ id: 1, label: 'PiP 1' }, { id: 2, label: 'PiP 2' }]
-				}, {
-					type: 'dropdown',
-					label: 'PiP on/off',
-					id: 'm',
-					default: '0',
-					choices: [{ id: 0, label: 'unpend (no change on Take)' }, {
-						id: 1,
-						label: 'pend (PiP on/off on Take)'
-					}]
-				}
-			]
-		},
-		'PIPISEL': {
-			label: 'Pend PiP Input',
-			options: [
-				{
-					type: 'dropdown',
-					label: 'PiP',
-					id: 'p',
-					default: '1',
-					choices: [{ id: 0, label: 'All PiPs' }, { id: 1, label: 'PiP 1' }, { id: 2, label: 'PiP 2' }]
-				},
-				{
-					type: 'dropdown',
-					label: 'Input',
-					id: 'i',
-					default: '1',
-					choices: this.CHOICES_INPUTS
-				}
-			]
-		},
-		'PIPREC': {
-			label: 'PiP Recall',
-			options: [
-				{
-					type: 'dropdown',
-					label: 'PiP',
-					id: 'p',
-					default: '1',
-					choices: [{ id: 1, label: 'PiP 1' }, { id: 2, label: 'PiP 2' }]
-				},
-				{
-					type: 'dropdown',
-					label: 'Input',
-					id: 'f',
-					default: '1',
-					choices: this.CHOICES_PIPRECALL
-				}
-			]
-		}
-	})
-}
-
-instance.prototype.action = function (action) {
-	let cmd = action.action
-	for (let option in action.options) {
-		if (action.options.hasOwnProperty(option) && action.options[option] !== '') cmd += ' -' + option + ' ' + action.options[option]
-	}
-	cmd += '\r'
-
-	if (action.action === 'FREEZE') {
-		cmd += 'FPUPDATE\r'
-	}
-
-	debug('sending tcp', cmd, 'to', this.config.host)
-
-	if (this.socket !== undefined && this.socket.connected) {
-		this.socket.send(cmd)
-	} else {
-		debug('Socket not connected :(')
+	/**
+	 * INTERNAL: initialize feedbacks.
+	 *
+	 * @private
+	 * @since 1.2.0
+	 */
+	_updateFeedbacks() {
+		this.setFeedbackDefinitions(this.getFeedbacks());
 	}
 }
 
-instance_skel.extendedBy(instance)
-exports = module.exports = instance
+exports = module.exports = BarcoPDS;
