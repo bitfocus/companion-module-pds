@@ -253,7 +253,7 @@ class BarcoPDS extends instanceSkel {
 						label: 'PiP',
 						id: 'p',
 						default: 1,
-						choices: [{id: 1, label: 'PiP 1'}, {id: 2, label: 'PiP 2'}]
+						choices: [{id: 1, label: '1'}, {id: 2, label: '2'}]
 					},
 					{
 						type: 'dropdown',
@@ -272,10 +272,100 @@ class BarcoPDS extends instanceSkel {
 						label: 'PiP',
 						id: 'p',
 						default: 1,
-						choices: [{id: 1, label: 'PiP 1'}, {id: 2, label: 'PiP 2'}]
+						choices: [{id: 1, label: '1'}, {id: 2, label: '2'}]
 					}
 				]
 			},
+			'PIPUNIT': {
+				label: 'PiP Unit mode',
+				options: [
+					{
+						type: 'dropdown',
+						label: 'Mode',
+						id: 'm',
+						default: 0,
+						choices: [{id: 0, label: 'Percentage'}, {id: 1, label: 'Pixel'}]
+					}
+				]
+			},
+			'PIPPOS': {
+				label: 'Position',
+				options: [
+					{
+						type: 'dropdown',
+						label: 'PiP',
+						id: 'p',
+						default: 1,
+						choices: [{id: 1, label: '1'}, {id: 2, label: '2'}]
+					},
+					{
+						type: 'textinput',
+						label: 'Horizontal offset from center',
+						id: 'hpos',
+						default: 0,
+						regex: this.REGEX_NUMBER
+					},
+					{
+						type: 'textinput',
+						label: 'Vertical offset from center',
+						id: 'vpos',
+						default: 0,
+						regex: this.REGEX_NUMBER
+					}
+				]
+			},
+			'PIPPOS': {
+				label: 'PiP Size',
+				options: [
+					{
+						type: 'dropdown',
+						label: 'PiP',
+						id: 'p',
+						default: 1,
+						choices: [{id: 1, label: '1'}, {id: 2, label: '2'}]
+					},
+					{
+						type: 'textinput',
+						label: 'Horizontal size',
+						id: 'hsize',
+						default: 0,
+						regex: this.REGEX_NUMBER
+					},
+					{
+						type: 'textinput',
+						label: 'Vertical size',
+						id: 'vsize',
+						default: 0,
+						regex: this.REGEX_NUMBER
+					}
+				]
+			},
+			'RBACKGND': {
+				label: 'PiP Background color',
+				options: [
+					{
+						type: 'textinput',
+						label: 'Red',
+						id: 'r',
+						default: 0,
+						regex: '/^\b(1?[0-9]{1,2}|2[0-4][0-9]|25[0-5])\b$/'
+					},
+					{
+						type: 'textinput',
+						label: 'Green',
+						id: 'g',
+						default: 0,
+						regex: '/^\b(1?[0-9]{1,2}|2[0-4][0-9]|25[0-5])\b$/'
+					},
+					{
+						type: 'textinput',
+						label: 'Blue',
+						id: 'b',
+						default: 0,
+						regex: '/^\b(1?[0-9]{1,2}|2[0-4][0-9]|25[0-5])\b$/'
+					}
+				]
+			}
 		});
 	}
 
@@ -293,13 +383,30 @@ class BarcoPDS extends instanceSkel {
 		}
 
 		let cmd = action.action;
-		for (let option in action.options) {
-			if (action.options.hasOwnProperty(option) && action.options[option] !== '') {
-				cmd += ' -' + option + ' ' + action.options[option];
-			}
-		}
-		cmd += '\r';
+		switch (cmd) {
+			case 'PIPPOS':
+				cmd = 'PIPHPOS -p ' + action.options.p + ' -o ' + action.options.hpos + '\r';
+				cmd += 'PIPVPOS -p ' + action.options.p + ' -o ' + action.options.vpos + '\r';
+				break;
+			case 'PIPSIZE':
+				cmd = 'PIPHSIZE -p ' + action.options.p + ' -w ' + action.options.hsize + '\r';
+				cmd += 'PIPVSIZE -p ' + action.options.p + ' -h ' + action.options.vsize + '\r';
+				break;
+			case 'RBACKGND':
+				cmd = 'RBACKGND -r ' + action.options.r + ' -g ' + action.options.g + ' -b ' + action.options.b + '\r';
 
+				break;
+			default:
+				for (let option in action.options) {
+					if (action.options.hasOwnProperty(option) && action.options[option] !== '') {
+						cmd += ' -' + option + ' ' + action.options[option];
+					}
+				}
+				cmd += '\r';
+				break;
+		}
+
+		// Add FPUPDATE to freeze command
 		if (action.action === 'FREEZE') {
 			cmd += 'FPUPDATE\r';
 		}
