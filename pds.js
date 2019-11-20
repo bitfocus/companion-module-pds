@@ -220,7 +220,8 @@ class BarcoPDS extends instanceSkel {
 						id: 'p',
 						default: 1,
 						choices: [{id: 1, label: '1'}, {id: 2, label: '2'}]
-					}, {
+					},
+					{
 						type: 'dropdown',
 						label: 'PiP on/off',
 						id: 'm',
@@ -546,7 +547,9 @@ class BarcoPDS extends instanceSkel {
 					'VER -?\r' +
 					'PREVIEW -?\r' +
 					'PROGRAM -?\r' +
-					'LOGOSEL -?\r'
+					'LOGOSEL -?\r' +
+					'PIPSTAT -p 1 -?\r' +
+					'PIPSTAT -p 2 -?\r'
 				);
 			}
 
@@ -582,10 +585,16 @@ class BarcoPDS extends instanceSkel {
 				this.checkFeedbacks('program_bg');
 			}
 
+			// Save current PiP state for feedback
+			if (line.match(/PIPSTAT -p \d -m \d+/)) {
+				const pipId                = parseInt(line.match(/-p (\d)/)[1]);
+				this.states['pip' + pipId] = parseInt(line.match(/-m (\d)/)[1]) === 1;
+				this.checkFeedbacks('pip_bg');
+			}
+
 			if (line.match(/-e -\d+/)) {
 				if (line.match(/ISEL -e -9999/)) {
-					this.log('error', 'Current selected input "' + this.states['preview_bg'] +
-						'" on ' + this.config.label + ' is' + ' a invalid signal!');
+					this.log('error', 'Current selected input "' + this.states['preview_bg'] + '" on ' + this.config.label + ' is' + ' a invalid signal!');
 					return;
 				}
 

@@ -19,7 +19,15 @@
 * Select Black/Logo
 * Save Logo
 * Set Autotake Mode on/off
-* Pend PiP Mode on/off
-* Pend PiP Input
-* Pend PiP Fullscreen
 
+* PiP Mode on/off
+* PiP Input
+* PiP Fullscreen
+* PiP Size + Position
+* PiP Background color
+
+**Feedback from Barco PDS**
+* Program Input
+* Preview Input
+* Selected Logo
+* Selected PiP

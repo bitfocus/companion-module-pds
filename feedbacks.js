@@ -93,6 +93,39 @@ module.exports = {
 			}
 		};
 
+		feedbacks['pip_bg'] = {
+			label: 'Change colors for PiP',
+			description: 'If the PiP specified is in use, change colors of the bank',
+			options: [
+				{
+					type: 'dropdown',
+					label: 'PiP',
+					id: 'p',
+					default: 1,
+					choices: [{id: 1, label: '1'}, {id: 2, label: '2'}]
+				},
+				{
+					type: 'colorpicker',
+					label: 'Foreground color',
+					id: 'fg',
+					default: this.rgb(255, 255, 255)
+				},
+				{
+					type: 'colorpicker',
+					label: 'Background color',
+					id: 'bg',
+					default: this.rgb(255, 0, 0)
+				},
+				inputOption
+			],
+			callback: (feedback, bank) => {
+				const pipId = parseInt(feedback.options.p);
+				if (this.states['pip' + pipId] === true) {
+					return {color: feedback.options.fg, bgcolor: feedback.options.bg};
+				}
+			}
+		};
+
 		return feedbacks;
 	}
 };
