@@ -5,9 +5,9 @@
 		"pds"
 	],
 	"version": "1.1.5",
-	"api_version": "1.0.0",
 	"keywords": [
-		"Image Processing"
+		"Image Processing",
+    "Video"
 	],
 	"manufacturer": "Barco",
 	"product": "PDS",
@@ -18,5 +18,8 @@
 		"test": "echo \"Error: no test specified\" && exit 1"
 	},
 	"author": "Dorian Meid <meid@backstage.org>",
+  "contributors": [
+    "Marc Hagen <hello@marchagen.nl> (http://marchagen.link)"
+  ],
 	"license": "MIT"
 }
