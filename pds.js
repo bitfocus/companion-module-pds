@@ -207,7 +207,7 @@ class BarcoPDS extends instanceSkel {
 					type: 'dropdown',
 					label: 'Autotake',
 					id: 'm',
-					default: '0',
+					default: 0,
 					choices: [{id: 0, label: 'off'}, {id: 1, label: 'on'}]
 				}]
 			},
@@ -218,13 +218,13 @@ class BarcoPDS extends instanceSkel {
 						type: 'dropdown',
 						label: 'PiP',
 						id: 'p',
-						default: '1',
-						choices: [{id: 1, label: 'PiP 1'}, {id: 2, label: 'PiP 2'}]
+						default: 1,
+						choices: [{id: 1, label: '1'}, {id: 2, label: '2'}]
 					}, {
 						type: 'dropdown',
 						label: 'PiP on/off',
 						id: 'm',
-						default: '0',
+						default: 0,
 						choices: [{id: 0, label: 'unpend (no change on Take)'}, {
 							id: 1,
 							label: 'pend (PiP on/off on Take)'
@@ -240,7 +240,7 @@ class BarcoPDS extends instanceSkel {
 						label: 'PiP',
 						id: 'p',
 						default: 1,
-						choices: [{id: 0, label: 'All PiPs'}, {id: 1, label: 'PiP 1'}, {id: 2, label: 'PiP 2'}]
+						choices: [{id: 0, label: 'All'}, {id: 1, label: '1'}, {id: 2, label: '2'}]
 					},
 					inputOption
 				]
@@ -263,7 +263,19 @@ class BarcoPDS extends instanceSkel {
 						choices: this.CHOICES_PIPRECALL
 					}
 				]
-			}
+			},
+			'PIPFULL': {
+				label: 'PiP Fullscreen',
+				options: [
+					{
+						type: 'dropdown',
+						label: 'PiP',
+						id: 'p',
+						default: 1,
+						choices: [{id: 1, label: 'PiP 1'}, {id: 2, label: 'PiP 2'}]
+					}
+				]
+			},
 		});
 	}
 
@@ -282,7 +294,9 @@ class BarcoPDS extends instanceSkel {
 
 		let cmd = action.action;
 		for (let option in action.options) {
-			if (action.options.hasOwnProperty(option) && action.options[option] !== '') cmd += ' -' + option + ' ' + action.options[option];
+			if (action.options.hasOwnProperty(option) && action.options[option] !== '') {
+				cmd += ' -' + option + ' ' + action.options[option];
+			}
 		}
 		cmd += '\r';
 
@@ -558,7 +572,7 @@ class BarcoPDS extends instanceSkel {
 		];
 
 		this.CHOICES_PIPRECALL = [
-			{id: 1, label: '1'},
+			{id: 1, label: 1},
 			{id: 2, label: '2'},
 			{id: 3, label: '3'},
 			{id: 4, label: '4'},

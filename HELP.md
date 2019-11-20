@@ -21,3 +21,5 @@
 * Set Autotake Mode on/off
 * Pend PiP Mode on/off
 * Pend PiP Input
+* Pend PiP Fullscreen
+
