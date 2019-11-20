@@ -71,6 +71,7 @@ class BarcoPDS extends instanceSkel {
 						type: 'textinput',
 						label: 'Filenumber (optional)',
 						id: 'f',
+						default: '',
 						regex: '/^([1-9]|[1-5][0-9]|6[0-4])$/'
 					}
 				]
@@ -452,7 +453,6 @@ class BarcoPDS extends instanceSkel {
 				break;
 			case 'RBACKGND':
 				cmd = 'RBACKGND -r ' + action.options.r + ' -g ' + action.options.g + ' -b ' + action.options.b + '\r';
-
 				break;
 			default:
 				for (let option in action.options) {
