@@ -158,12 +158,64 @@ class BarcoPDS extends instanceSkel {
 						id: 'o',
 						default: 1,
 						choices: [{id: 1, label: 'Program'}, {id: 3, label: 'Preview'}]
-					}, {
+					},
+					{
 						type: 'dropdown',
 						label: 'Rasterbox',
 						id: 'm',
 						default: 1,
 						choices: [{id: 0, label: 'off'}, {id: 1, label: 'on'}]
+					}
+				]
+			},
+
+			'BACKGND': {
+				label: 'Background mode',
+				options: [
+					{
+						type: 'dropdown',
+						label: 'Output',
+						id: 'o',
+						default: 1,
+						choices: [{id: 1, label: 'Program'}, {id: 3, label: 'Preview'}]
+					},
+					{
+						type: 'dropdown',
+						label: 'Background',
+						id: 'b',
+						default: 1,
+						choices: [
+							{id: 1, label: 'Black'},
+							{id: 2, label: 'Grey'},
+							{id: 3, label: 'Logo (Only program)'},
+							{id: 4, label: 'Custom color'},
+						]
+					}
+				]
+			},
+			'RBACKGND': {
+				label: 'Background color',
+				options: [
+					{
+						type: 'textinput',
+						label: 'Red',
+						id: 'r',
+						default: 0,
+						regex: '/^\b(1?[0-9]{1,2}|2[0-4][0-9]|25[0-5])\b$/'
+					},
+					{
+						type: 'textinput',
+						label: 'Green',
+						id: 'g',
+						default: 0,
+						regex: '/^\b(1?[0-9]{1,2}|2[0-4][0-9]|25[0-5])\b$/'
+					},
+					{
+						type: 'textinput',
+						label: 'Blue',
+						id: 'b',
+						default: 0,
+						regex: '/^\b(1?[0-9]{1,2}|2[0-4][0-9]|25[0-5])\b$/'
 					}
 				]
 			},
@@ -226,10 +278,10 @@ class BarcoPDS extends instanceSkel {
 						label: 'PiP on/off',
 						id: 'm',
 						default: 0,
-						choices: [{id: 0, label: 'unpend (no change on Take)'}, {
-							id: 1,
-							label: 'pend (PiP on/off on Take)'
-						}]
+						choices: [
+							{id: 0, label: 'unpend (no change on Take)'},
+							{id: 1, label: 'pend (PiP on/off on Take)'}
+						]
 					}
 				]
 			},
@@ -244,6 +296,37 @@ class BarcoPDS extends instanceSkel {
 						choices: [{id: 0, label: 'All'}, {id: 1, label: '1'}, {id: 2, label: '2'}]
 					},
 					inputOption
+				]
+			},
+			'PIPRST': {
+				label: 'PiP Reset',
+				options: [
+					{
+						type: 'dropdown',
+						label: 'PiP',
+						id: 'p',
+						default: 1,
+						choices: [{id: 1, label: '1'}, {id: 2, label: '2'}]
+					}
+				]
+			},
+			'PIPSAVE': {
+				label: 'PiP Reset',
+				options: [
+					{
+						type: 'dropdown',
+						label: 'PiP',
+						id: 'p',
+						default: 1,
+						choices: [{id: 1, label: '1'}, {id: 2, label: '2'}]
+					},
+					{
+						type: 'dropdown',
+						label: 'Input',
+						id: 'f',
+						default: 1,
+						choices: this.CHOICES_PIPFILE
+					}
 				]
 			},
 			'PIPREC': {
@@ -261,7 +344,7 @@ class BarcoPDS extends instanceSkel {
 						label: 'Input',
 						id: 'f',
 						default: 1,
-						choices: this.CHOICES_PIPRECALL
+						choices: this.CHOICES_PIPFILE
 					}
 				]
 			},
@@ -338,32 +421,6 @@ class BarcoPDS extends instanceSkel {
 						id: 'vsize',
 						default: 0,
 						regex: this.REGEX_NUMBER
-					}
-				]
-			},
-			'RBACKGND': {
-				label: 'PiP Background color',
-				options: [
-					{
-						type: 'textinput',
-						label: 'Red',
-						id: 'r',
-						default: 0,
-						regex: '/^\b(1?[0-9]{1,2}|2[0-4][0-9]|25[0-5])\b$/'
-					},
-					{
-						type: 'textinput',
-						label: 'Green',
-						id: 'g',
-						default: 0,
-						regex: '/^\b(1?[0-9]{1,2}|2[0-4][0-9]|25[0-5])\b$/'
-					},
-					{
-						type: 'textinput',
-						label: 'Blue',
-						id: 'b',
-						default: 0,
-						regex: '/^\b(1?[0-9]{1,2}|2[0-4][0-9]|25[0-5])\b$/'
 					}
 				]
 			}
@@ -687,18 +744,10 @@ class BarcoPDS extends instanceSkel {
 			{id: 6, label: '6 DVI'}
 		];
 
-		this.CHOICES_PIPRECALL = [
-			{id: 1, label: 1},
-			{id: 2, label: '2'},
-			{id: 3, label: '3'},
-			{id: 4, label: '4'},
-			{id: 5, label: '5'},
-			{id: 6, label: '6'},
-			{id: 7, label: '7'},
-			{id: 8, label: '8'},
-			{id: 9, label: '9'},
-			{id: 10, label: '10'}
-		];
+		this.CHOICES_PIPFILE = [];
+		[...Array(10).keys()].forEach((v) => {
+			this.CHOICES_PIPFILE.push({id: v + 1, label: v + 1});
+		});
 
 		// See this.PDS_VARIANT
 		// 901 and 902 have DVI

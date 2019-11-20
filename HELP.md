@@ -19,10 +19,13 @@
 * Select Black/Logo
 * Save Logo
 * Set Autotake Mode on/off
-
-* PiP Mode on/off
-* PiP Input
+* Set Background (Black/Grey/Logo/Custom color)
+* Pend PiP Mode on/off
+* Pend PiP Input
+* Pend PiP Recall
+* PiP Save/Reset
 * PiP Fullscreen
+* PiP Unit mode
 * PiP Size + Position
 * PiP Background color
 
