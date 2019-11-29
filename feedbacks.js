@@ -26,7 +26,7 @@ module.exports = {
 					type: 'colorpicker',
 					label: 'Foreground color',
 					id: 'fg',
-					default: this.rgb(255, 255, 255)
+					default: this.rgb(0, 0, 0)
 				},
 				{
 					type: 'colorpicker',
@@ -37,7 +37,7 @@ module.exports = {
 				inputOption
 			],
 			callback: (feedback, bank) => {
-				if (this.states['preview_bg'] === parseInt(feedback.options.input)) {
+				if (this.states.preview_bg === parseInt(feedback.options.input)) {
 					return {color: feedback.options.fg, bgcolor: feedback.options.bg};
 				}
 			}
@@ -62,7 +62,7 @@ module.exports = {
 				inputOption
 			],
 			callback: (feedback, bank) => {
-				if (this.states['program_bg'] === parseInt(feedback.options.input)) {
+				if (this.states.program_bg === parseInt(feedback.options.input)) {
 					return {color: feedback.options.fg, bgcolor: feedback.options.bg};
 				}
 			}
@@ -87,7 +87,7 @@ module.exports = {
 				inputOption
 			],
 			callback: (feedback, bank) => {
-				if (this.states['logo_bg'] === parseInt(feedback.options.input)) {
+				if (this.states.logo_bg === parseInt(feedback.options.input)) {
 					return {color: feedback.options.fg, bgcolor: feedback.options.bg};
 				}
 			}
@@ -121,6 +121,30 @@ module.exports = {
 			callback: (feedback, bank) => {
 				const pipId = parseInt(feedback.options.p);
 				if (this.states['pip' + pipId] === true) {
+					return {color: feedback.options.fg, bgcolor: feedback.options.bg};
+				}
+			}
+		};
+
+		feedbacks['freeze_bg'] = {
+			label: 'Change colors for Freeze',
+			description: 'If the freeze specified is in use, change colors of the bank',
+			options: [
+				{
+					type: 'colorpicker',
+					label: 'Foreground color',
+					id: 'fg',
+					default: this.rgb(0, 0, 0)
+				},
+				{
+					type: 'colorpicker',
+					label: 'Background color',
+					id: 'bg',
+					default: this.rgb(0, 255, 0)
+				}
+			],
+			callback: (feedback, bank) => {
+				if (this.states.freeze === 1) {
 					return {color: feedback.options.fg, bgcolor: feedback.options.bg};
 				}
 			}

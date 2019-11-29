@@ -1,12 +1,18 @@
 const tcp          = require('../../tcp');
 const instanceSkel = require('../../instance_skel');
-let debug, log;
-
-const feedbacks = require('./feedbacks');
 
 const PDS_VARIANT_701 = 1;
 const PDS_VARIANT_901 = 2;
 const PDS_VARIANT_902 = 3;
+
+const OUTMODE_FULLSCREEN = 1;
+const OUTMODE_PIP        = 2;
+const OUTMODE_MATRIX     = 3;
+
+const FREEZE_FROZEN   = 1;
+const FREEZE_UNFROZEN = 0;
+
+const feedbacks = require('./feedbacks');
 
 /**
  * Companion instance class for the Epiphan Pearl.
@@ -34,6 +40,8 @@ class BarcoPDS extends instanceSkel {
 
 		this.states          = {};
 		this.refreshInterval = null;
+
+		this.outMode = 0;
 
 		Object.assign(this, {
 			//...actions,
@@ -82,8 +90,8 @@ class BarcoPDS extends instanceSkel {
 					type: 'dropdown',
 					label: 'Freeze',
 					id: 'm',
-					default: 1,
-					choices: [{id: 0, label: 'unfrozen'}, {id: 1, label: 'frozen'}]
+					default: -1,
+					choices: [{id: -1, label: 'Toggle'}, {id: 1, label: 'Frozen'}, {id: 0, label: 'Unfrozen'}]
 				}]
 			},
 			'BLACK': {
@@ -93,7 +101,7 @@ class BarcoPDS extends instanceSkel {
 					label: 'Mode',
 					id: 'm',
 					default: 1,
-					choices: [{id: 0, label: 'normal'}, {id: 1, label: 'black'}]
+					choices: [{id: 0, label: 'Normal'}, {id: 1, label: 'Black'}]
 				}]
 			},
 			'OTPM': {
@@ -111,7 +119,7 @@ class BarcoPDS extends instanceSkel {
 						label: 'Testpattern',
 						id: 'm',
 						default: 1,
-						choices: [{id: 0, label: 'off'}, {id: 1, label: 'on'}]
+						choices: [{id: 0, label: 'Off'}, {id: 1, label: 'On'}]
 					}
 				]
 			},
@@ -165,7 +173,7 @@ class BarcoPDS extends instanceSkel {
 						label: 'Rasterbox',
 						id: 'm',
 						default: 1,
-						choices: [{id: 0, label: 'off'}, {id: 1, label: 'on'}]
+						choices: [{id: 0, label: 'Off'}, {id: 1, label: 'On'}]
 					}
 				]
 			},
@@ -261,7 +269,7 @@ class BarcoPDS extends instanceSkel {
 					label: 'Autotake',
 					id: 'm',
 					default: 0,
-					choices: [{id: 0, label: 'off'}, {id: 1, label: 'on'}]
+					choices: [{id: 0, label: 'Off'}, {id: 1, label: 'On'}]
 				}]
 			},
 			'PENDPIP': {
@@ -280,8 +288,8 @@ class BarcoPDS extends instanceSkel {
 						id: 'm',
 						default: 0,
 						choices: [
-							{id: 0, label: 'unpend (no change on Take)'},
-							{id: 1, label: 'pend (PiP on/off on Take)'}
+							{id: 0, label: 'Unpend (no change on Take)'},
+							{id: 1, label: 'Pend (PiP on/off on Take)'}
 						]
 					}
 				]
@@ -454,6 +462,16 @@ class BarcoPDS extends instanceSkel {
 			case 'RBACKGND':
 				cmd = 'RBACKGND -r ' + action.options.r + ' -g ' + action.options.g + ' -b ' + action.options.b + '\r';
 				break;
+			case 'FREEZE':
+				cmd += ' -m ';
+				if (parseInt(action.options.m) == -1) {
+					cmd += !this.states['freeze'] ? '1' : '0';
+				} else {
+					cmd += action.options.m;
+				}
+				cmd += '\r';
+				cmd += 'FPUPDATE\r';
+				break;
 			default:
 				for (let option in action.options) {
 					if (action.options.hasOwnProperty(option) && action.options[option] !== '') {
@@ -464,12 +482,7 @@ class BarcoPDS extends instanceSkel {
 				break;
 		}
 
-		// Add FPUPDATE to freeze command
-		if (action.action === 'FREEZE') {
-			cmd += 'FPUPDATE\r';
-		}
-
-		debug('sending tcp', cmd, 'to', this.config.host);
+		this.debug('sending tcp', cmd, 'to', this.config.host);
 		this.socket.send(cmd);
 	}
 
@@ -518,7 +531,7 @@ class BarcoPDS extends instanceSkel {
 
 		this.states = {};
 
-		debug('destroy', this.id);
+		this.debug('destroy', this.id);
 	}
 
 	/**
@@ -529,9 +542,6 @@ class BarcoPDS extends instanceSkel {
 	 * @since 1.2.0
 	 */
 	init() {
-		debug = this.debug;
-		log   = this.log;
-
 		this.status(this.STATUS_UNKNOWN);
 
 		this._initTcp();
@@ -571,7 +581,7 @@ class BarcoPDS extends instanceSkel {
 		});
 
 		this.socket.on('error', (err) => {
-			debug("Network error", err);
+			this.debug("Network error", err);
 			this.status(this.STATE_ERROR, err);
 			this.log('error', `Network error: ${err.message}`);
 			if (this.refreshInterval) clearInterval(this.refreshInterval);
@@ -579,8 +589,8 @@ class BarcoPDS extends instanceSkel {
 
 		this.socket.on('connect', () => {
 			this.status(this.STATE_OK);
-			debug("Connected");
-			this.refreshInterval = setInterval(this.refreshData.bind(this), 1000);
+			this.debug("Connected");
+			this.refreshInterval = setInterval(this._refreshData.bind(this), 1000);
 		});
 
 		// separate buffered stream into lines with responses
@@ -599,15 +609,7 @@ class BarcoPDS extends instanceSkel {
 		this.socket.on('receiveline', (line) => {
 			// check which device and version we have
 			if (line.match(/ShellApp waiting for input/)) {
-				this.socket.send(
-					'\r' +
-					'VER -?\r' +
-					'PREVIEW -?\r' +
-					'PROGRAM -?\r' +
-					'LOGOSEL -?\r' +
-					'PIPSTAT -p 1 -?\r' +
-					'PIPSTAT -p 2 -?\r'
-				);
+				this._refreshData();
 			}
 
 			if (line.match(/VER \d/)) {
@@ -618,10 +620,17 @@ class BarcoPDS extends instanceSkel {
 				this.states['preview_bg'] = parseInt(line.match(/-i(\d+)/)[1]);
 				this.checkFeedbacks('preview_bg');
 			}
+
 			if (line.match(/PROGRAM -i\d+/)) {
 				this.states['program_bg'] = parseInt(line.match(/-i(\d+)/)[1]);
 				this.checkFeedbacks('program_bg');
 			}
+
+			if (line.match(/FREEZE -m \d+/)) {
+				this.states['freeze'] = parseInt(line.match(/-m (\d+)/)[1]);
+				this.checkFeedbacks('freeze_bg');
+			}
+
 			if (line.match(/LOGOSEL -l \d+/)) {
 				this.states['logo_bg'] = parseInt(line.match(/-l (\d+)/)[1]);
 				this.checkFeedbacks('logo_bg');
@@ -642,6 +651,11 @@ class BarcoPDS extends instanceSkel {
 				this.checkFeedbacks('program_bg');
 			}
 
+			// Save current output mode
+			if (line.match(/OUTMODE -m \d+/)) {
+				this.outMode = parseInt(line.match(/-m (\d)/)[1]);
+			}
+
 			// Save current PiP state for feedback
 			if (line.match(/PIPSTAT -p \d -m \d+/)) {
 				const pipId                = parseInt(line.match(/-p (\d)/)[1]);
@@ -657,7 +671,7 @@ class BarcoPDS extends instanceSkel {
 
 				switch (parseInt(line.match(/-e -(\d+)/)[1])) {
 					case 9999:
-						self.log('error', 'Received generic fail error from PDS ' + this.config.label + ': ' + line);
+						this.log('error', 'Received generic fail error from PDS ' + this.config.label + ': ' + line);
 						break;
 					case 9998:
 						this.log('error', 'PDS ' + this.config.label + ' says: Operation is not applicable in current state: ' + line);
@@ -776,12 +790,21 @@ class BarcoPDS extends instanceSkel {
 			return;
 		}
 
-		this.socket.send(
+		let cmd = '\r' +
+			'VER -?\r' +
 			'PREVIEW -?\r' +
 			'PROGRAM -?\r' +
-			'LOGOSEL -?\r'
-		);
-	};
+			'FREEZE -?\r' +
+			'LOGOSEL -?\r' +
+			'OUTMODE -?\r';
+
+		if (this.outMode === OUTMODE_PIP) {
+			cmd += 'PIPSTAT -p 1 -?\r' +
+				'PIPSTAT -p 2 -?\r';
+		}
+
+		this.socket.send(cmd);
+	}
 
 	/**
 	 * INTERNAL: Get action from the options for start and stop
