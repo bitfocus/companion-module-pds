@@ -18,6 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     * PiP Feedback for companion
     * PiP Reset and Save
 
+* Freeze feedback
+
 ## Bug Fixes 
 * [#7](https://github.com/bitfocus/companion-module-pds/issues/7) Fixed fontpanel didn't update on Freeze
 
