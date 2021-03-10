@@ -11,7 +11,6 @@ function instance (system, id, config) {
 	const self = this
 
 	this.firmwareVersion = '0'
-	this.firmwareVersionIsOver3 = false // some commands are only working with firmware >= 3
 
 	// super-constructor
 	instance_skel.apply(this, arguments)
@@ -112,8 +111,6 @@ instance.prototype.init_tcp = function () {
 
 			if (line.match(/VER \d/)) {
 				self.firmwareVersion = line.match(/VER ((?:\d+\.?)+)/)[1]
-				if (parseInt(self.firmwareVersion) >= 3) self.firmwareVersionIsOver3 = true
-				debug('version = ', self.firmwareVersion, ' is over 3: ', self.firmwareVersionIsOver3)
 			}
 
 			if (line.match(/PREVIEW -i\d+/)) {
@@ -219,7 +216,7 @@ instance.prototype.config_fields = function () {
 			type: 'dropdown',
 			label: 'Variant',
 			id: 'variant',
-			default: '1',
+			default: 1,
 			choices: self.PDS_VARIANT
 		}
 	]
@@ -391,8 +388,7 @@ instance.prototype.actions = function (system) {
 	]
 
 	// See self.PDS_VARIANT
-	if (self.config.variant == PDS_VARIANT_901 ||
-		self.config.variant == PDS_VARIANT_902) {
+	if (parseInt(self.config.variant) >= PDS_VARIANT_901) {
 		self.CHOICES_INPUTS.push({ id: 7, label: '7 DVI' })
 		self.CHOICES_INPUTS.push({ id: 8, label: '8 DVI' })
 	}
@@ -634,6 +630,10 @@ instance.prototype.action = function (action) {
 		if (action.options.hasOwnProperty(option) && action.options[option] !== '') cmd += ' -' + option + ' ' + action.options[option]
 	}
 	cmd += '\r'
+	
+	if (action.action == 'FREEZE') {
+		cmd += 'FPUPDATE\r'
+	}
 
 	if (cmd !== undefined) {
 		debug('sending tcp', cmd, 'to', self.config.host)
